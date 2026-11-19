@@ -4,7 +4,7 @@ const COL={R:'#e53935',B:'#1e88e5',Y:'#f9a825',G:'#43a047',P:'#8e24aa'},JP={R:'�
 const rc=()=>K[Math.random()*5|0],rp=()=>rc()+rc(),cp=o=>JSON.parse(JSON.stringify(o));
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
-let uid,code,room,g,prev=null,lastEv=null,sel=0,mode='',asg=[],ps=-1,cpuT=null;
+let hideRes=false,uid,code,room,g,prev=null,lastEv=null,sel=0,mode='',asg=[],ps=-1,cpuT=null;
 firebase.auth().signInAnonymously().then(r=>{uid=r.user.uid;render()}).catch(e=>{$('app').textContent='ログイン失敗: '+e.message});
 
 /* ---------- ロビー ---------- */
@@ -89,11 +89,17 @@ function giveTo(to){if(ps<0)return;asg.push({i:ps,to,c:g.push[ps]});ps=-1;
 function resetAsg(){asg=[];ps=-1;render()}
 
 /* ---------- 描画 ---------- */
-const cardH=(x,cls,ex)=>`<i class="cd ${cls||''}" style="--img:url('${CARD_IMG[x]}');--c:${COL[x]}" ${ex||''}>${CARD_LABEL?`<b>${JP[x]}</b>`:''}</i>`;
+const cardH=(x,cls,ex,pl)=>`<i class="cd ${cls||''}" style="--img:${pl?'none':`url('${CARD_IMG[x]}')`};--c:${COL[x]}" ${ex||''}>${CARD_LABEL&&!pl?`<b>${JP[x]}</b>`:''}</i>`;
+function stockH(i,small){const n=gc(),o=[];let qi=0;
+ if(g.ph==='place'&&i===g.t)[...g.hand].forEach((x,k)=>o.push([x,!small&&sel===k?'sel':'',!small?`onclick="setSel(${k})"`:'','']));
+ else if(g.ph==='bonus'&&i===g.t&&g.bc)o.push([g.bc,'','','']);
+ else if(g.ph==='push'&&i===g.t)[...g.push].forEach((x,k)=>{const d=asg.findIndex(a=>a.i===k);o.push([x,(ps===k?'sel ':'')+(d>=0?'dim':''),!small?`onclick="selPush(${k})"`:'',d>=0?d+1:''])});
+ else if(g.ph==='recv')n.q.forEach((it,k)=>{if(+it[0]===i){qi++;o.push([it[1],k===0?'cur':'','',qi])}});
+ return `<div class="stock">`+o.map(([x,c,e,bd])=>`<span class="sk">${cardH(x,c,e,small)}${bd?`<em>${bd}</em>`:''}</span>`).join('')+`</div>`}
 function boardH(i,small){const b=g.b[i],me=g.pl[i].id===uid,a=actor(gc()),pc=(g.pc||K)[i];
  const ok=!small&&me&&myTurn()&&(g.ph==='place'||g.ph==='recv'||(g.ph==='bonus'&&(g.bc||mode==='x')));
- return `<div class="bd ${small?'sm':'big'} ${i===g.t&&g.ph!=='over'?'turn':''} ${i===a&&g.ph!=='over'?'act':''}" style="--pc:${COL[pc]}"><div class="plate"><span class="gem"></span><span class="pn">${esc(g.pl[i].name)}${g.pl[i].cpu?' (CPU)':''}</span><span class="sc" data-sc="${i}">${g.s[i]}<small>点</small></span></div><div class="cols">`+
- b.map((c,ci)=>`<div class="col ${ok?'ok':''}" ${ok?`onclick="colClick(${ci})"`:''}>`+[...c].map((x,k)=>cardH(x,'',`data-k="${i}-${ci}-${k}"`)).join('')+`</div>`).join('')+`</div></div>`}
+ return `<div class="bd ${small?'sm':'big'} ${i===g.t&&g.ph!=='over'?'turn':''} ${i===a&&g.ph!=='over'?'act':''}" style="--pc:${COL[pc]}"><div class="plate"><span class="gem"></span><span class="pn">${esc(g.pl[i].name)}${g.pl[i].cpu?' (CPU)':''}</span><span class="sc" data-sc="${i}">${g.s[i]}<small>点</small></span></div>${stockH(i,small)}<div class="cols">`+
+ b.map((c,ci)=>`<div class="col ${ok?'ok':''}" ${ok?`onclick="colClick(${ci})"`:''}>`+[...c].map((x,k)=>cardH(x,'',`data-k="${i}-${ci}-${k}"`,small)).join('')+`</div>`).join('')+`</div></div>`}
 function snap(){const m={};document.querySelectorAll('[data-k]').forEach(e=>{m[e.dataset.k]={r:e.getBoundingClientRect(),n:e.cloneNode(true)}});return m}
 function ghost(d){const e=d.n;e.classList.remove('new','bt');e.classList.add('ghost');
  e.style.left=d.r.left+'px';e.style.top=d.r.top+'px';e.style.width=d.r.width+'px';e.style.height=d.r.height+'px';
@@ -113,28 +119,33 @@ function animate(old){
    else if(o.length>s.length&&o.startsWith(s)){for(let k=s.length;k<o.length;k++){const d=old[p+'-'+c+'-'+k];d&&ghost(d)}}}));
  if(!prev)lastEv=g.ev&&g.ev.id;
  else if(g.ev&&g.ev.id!==lastEv){lastEv=g.ev.id;banner(g.ev)}}
-const titleH=small=>small?`<div class="mini">星を放つ夜<span>MeteoNight ONLINE</span></div>`:`<div class="hero"><div class="dia">◆ ━━━ ◇ ━━━ ◆</div><h1 class="title">星を放つ夜</h1><div class="sub">MeteoNight&nbsp;ONLINE</div></div>`;
+const titleH=(small,c)=>small?`<div class="mini">星を放つ夜<span>MeteoNight ONLINE</span><em class="rc">${c}</em></div>`:`<div class="hero"><div class="dia">◆ ━━━ ◇ ━━━ ◆</div><h1 class="title">星を放つ夜</h1><div class="sub">MeteoNight&nbsp;ONLINE</div></div>`;
+function resultH(){const r=g.pl.map((p,i)=>({i,s:g.s[i]})).sort((x,y)=>y.s-x.s||x.i-y.i),N=r.length;
+ return `<div class="result"><div class="rbox"><div class="rt">— RESULT —</div><div class="rh">${esc(g.pl[r[0].i].name)} の勝利！</div>`+
+ r.map((o,k)=>`<div class="rr${k?'':' top'}" style="--pc:${COL[(g.pc||K)[o.i]]};--d:${N-1-k}"><span class="rk">${k+1}<small>位</small></span><span class="gem"></span><span class="rn">${esc(g.pl[o.i].name)}${g.pl[o.i].cpu?' (CPU)':''}</span><span class="rs">${o.s}<small>点</small></span></div>`).join('')+
+ `<button onclick="hideRes=true;render()">盤面を見る</button><button class="pri" onclick="location.reload()">最初に戻る</button></div></div>`}
 function render(){const A=$('app');
  if(!uid)return;
  if(!code){A.innerHTML=titleH(0)+`<div class="panel entry"><label>なまえ</label><input id="nm" value="${esc(localStorage.hn||'')}" maxlength="10"><br><button class="pri" onclick="mk()">部屋をつくる</button><div class="or">─ または ─</div><label>部屋コード</label><input id="cd" size="6" inputmode="numeric"><br><button onclick="jn()">参加する</button></div>`;return}
  if(!room){A.textContent='読み込み中…';return}
- if(!g){prev=null;const ps=Object.entries(room.players).sort((a,b)=>a[1].t-b[1].t),host=room.host===uid;
+ if(!g){prev=null;hideRes=false;const ps=Object.entries(room.players).sort((a,b)=>a[1].t-b[1].t),host=room.host===uid;
   const seats=[0,1,2,3,4].map(i=>{const p=ps[i];return p?`<div class="seat on"><span class="gem" style="--pc:#e8d9a0"></span>${esc(p[1].n)}${p[1].c?' <small>CPU</small>':''}</div>`:`<div class="seat"><span class="gem off"></span>空席</div>`}).join('');
   A.innerHTML=titleH(0)+`<div class="panel lobby"><div class="ttl">◆ 部屋コード ◆</div><div class="code">${code}</div><div class="hint">このコードを仲間に伝えよう</div><div class="seats">${seats}</div>`+
   (host?`<button class="g" onclick="addCpu()">CPUを追加</button><button class="pri" onclick="start()" ${ps.length<2?'disabled':''}>ゲーム開始</button>`:'<div class="hint">ホストの開始を待っています…</div>')+`</div>`;return}
- const me=g.pl.findIndex(p=>p.id===uid),mt=myTurn(),n=gc();let ctl='';
- const hand=(s,fn)=>`<span class="chips">`+[...s].map((x,i)=>cardH(x,fn&&sel===i?'sel':'',fn?`onclick="${fn}(${i})"`:'')).join('')+`</span>`;
- if(g.ph==='over'){ctl=`<h3 style="font-family:var(--serif);font-size:28px;color:var(--gold)">🏆 ${esc(g.pl[g.win].name)} の勝利！</h3>`+g.pl.map((p,i)=>esc(p.name)+' '+g.s[i]+'点').join(' ／ ')+`<br><button class="pri" onclick="location.reload()">最初に戻る</button>`}
- else if(g.ph==='recv'){const c=n.q[0];ctl=(mt?'押し付けられました！ 置く列をタップ：':esc(g.pl[+c[0]].name)+' が押し付けカードを置く…')+hand(c[1])}
- else if(!mt)ctl=`${esc(g.pl[g.t].name)} のターン…`+(g.ph==='bonus'&&g.bc?' めくったカード：'+hand(g.bc):'');
- else if(g.ph==='pick')ctl=`ネクストスロットから1組選ぶか、ランダムで引く`;
- else if(g.ph==='place')ctl=`置くカードを選び、置く列をタップ<br>${hand(g.hand,'setSel')}`;
- else if(g.ph==='bonus')ctl=g.bc?`めくれたカード：${hand(g.bc)} 置く列をタップ`:`魔法発動ボーナス：<button class="${mode==='x'?'':'g'}" onclick="setMode('x')">一番下を除外(列をタップ)</button><button onclick="flip()">山札から1枚めくる</button>`;
- else if(g.ph==='push')ctl=`押し付け：渡す順にカードをタップ${g.pl.length>2?'→相手を選ぶ':''}<br>`+[...g.push].map((x,i)=>{const k=asg.findIndex(a=>a.i===i);
-  return `<span class="chips pk">${cardH(x,(ps===i?'sel ':'')+(k>=0?'dim':''),`onclick="selPush(${i})"`)}${k>=0?`<small>${k+1}番目→${esc(g.pl[asg[k].to].name)}</small>`:''}</span>`}).join('')+`<br>`+
-  (g.pl.length>2?g.pl.map((p,i)=>i===g.t?'':`<button onclick="giveTo(${i})">${esc(p.name)}</button>`).join(''):'')+`<button class="g" onclick="resetAsg()">やり直し</button>`;
+ const me=g.pl.findIndex(p=>p.id===uid),mt=myTurn(),n=gc(),a=actor(n),an=esc(g.pl[a].name);
+ let tt,mx='',mb='';
+ if(g.ph==='over'){tt='ゲーム終了';mx='全員の手番が終わりました';mb=`<button class="pri" onclick="hideRes=false;render()">結果を見る</button>`}
+ else{tt=mt?'あなたの番':an+' の番';
+  if(g.ph==='pick')mx=mt?'ネクストスロットから星を1組えらんでください':'星を選んでいます…';
+  else if(g.ph==='place')mx=mt?'ストックの星を選んで、置く列をタップしてください':'星を置いています…';
+  else if(g.ph==='bonus'){mx=mt?(g.bc?'めくれた星を置く列をタップしてください':'魔法ボーナス！ 山札をめくるか、一番下を除外'):'魔法ボーナスを選んでいます…';
+   if(mt&&!g.bc)mb=`<button class="${mode==='x'?'':'g'}" onclick="setMode('x')">一番下を除外(列をタップ)</button><button onclick="flip()">山札から1枚めくる</button>`}
+  else if(g.ph==='push'){mx=mt?'ストックの星を、渡す順にタップ'+(g.pl.length>2?' → 相手を選ぶ':''):'星を押し付けています…';
+   if(mt)mb=(g.pl.length>2?g.pl.map((p,i)=>i===g.t?'':`<button onclick="giveTo(${i})">${esc(p.name)}</button>`).join(''):'')+`<button class="g" onclick="resetAsg()">やり直し</button>`}
+  else if(g.ph==='recv')mx=mt?'押し付けられた星を置く列をタップしてください':'押し付けられた星を置いています…'}
+ const others=g.pl.map((_,i)=>i===me?'':boardH(i,1)).join('');
  const old=snap();
- A.innerHTML=titleH(1)+`<div class="panel log">${esc(g.log)}<span class="rm">${code}</span></div><div class="bds">${g.pl.map((_,i)=>i===me?'':boardH(i,1)).join('')}</div>`+
- `<div class="panel"><div class="ttl">◆ ネクストスロット</div>${g.nx.map((p,i)=>`<span class="pair">${[...p].map(x=>cardH(x)).join('')}${mt&&g.ph==='pick'?`<button onclick="pk(${i})">選ぶ</button>`:''}</span>`).join('')}${mt&&g.ph==='pick'?`<button class="g" onclick="pk(-1)">ランダムで引く</button>`:''}</div>`+
- `<div class="panel"><div class="ttl">◆ ${mt?'あなたの番':'待機中'}</div>${ctl}</div>`+(me>=0?boardH(me,0):'')+`<div class="foot">20点で最終ターン(全員同回数)　手番順: ${g.pl.map(p=>esc(p.name)).join(' → ')}</div>`;
+ A.innerHTML=titleH(1,code)+`<div class="game"><div class="gl"><div class="panel nx"><div class="ttl">◆ ネクストスロット</div>${g.nx.map((p,i)=>`<span class="pair">${[...p].map(x=>cardH(x)).join('')}${mt&&g.ph==='pick'?`<button onclick="pk(${i})">選ぶ</button>`:''}</span>`).join('')}${mt&&g.ph==='pick'?`<button class="g" onclick="pk(-1)">ランダムで引く</button>`:''}</div>${me>=0?boardH(me,0):''}</div>`+
+ `<div class="gr"><div class="panel msg ${mt?'mine':''}"><div class="mt">${tt}</div><div class="mx">${mx}</div><div class="mb">${mb}</div><div class="lg">${esc(g.log)}</div></div><div class="others n${g.pl.length-1}">${others}</div></div></div>`+
+ `<div class="foot">20点で最終ターン(全員同回数)　手番順: ${g.pl.map(p=>esc(p.name)).join(' → ')}</div>`+(g.ph==='over'&&!hideRes?resultH():'');
  animate(old);prev=g}
