@@ -138,3 +138,19 @@ button:disabled{opacity:.35;filter:grayscale(.7) brightness(.7);cursor:default}
 .sp{font-family:var(--serif);font-weight:800;font-size:26px;color:var(--gold);line-height:1}.sp small{font-size:12px}
 .bar{grid-column:1/-1;height:6px;background:#0007;border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pc)}
 .rb{margin-top:14px}
+
+/* アドバンス・揃った色・ルール表 */
+.lobby{max-width:640px}
+.opts{display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:center;align-items:center;margin:10px 0;font-family:var(--serif);font-weight:700}
+.opts input{width:70px;text-align:center;margin:0 4px}
+.races{text-align:left;font-size:12px;color:#ccd;background:#0005;border-radius:10px;padding:8px 12px;margin:8px 0}.races div{margin:3px 0}.races b{color:var(--gold)}
+.seat{flex-wrap:wrap}.sn2{flex:1}.seat small{color:var(--gold);font-size:12px}
+select{font-size:14px;padding:6px;border-radius:8px;background:#070b26;color:#fff;border:1px solid #e8d9a088;max-width:48vw}
+.pn small{display:block;font-size:10px;color:#aab;font-family:'Noto Sans JP',sans-serif;font-weight:400}
+.mg{--cs:calc(var(--bs)*.5);display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:calc(var(--bs)*.5 + 10px);padding:3px 8px;margin-bottom:5px;border:1px solid #e8d9a033;border-radius:8px;background:#0003}
+.mg:empty::before{content:'METEOR';font-family:Cinzel,serif;font-size:10px;letter-spacing:.3em;color:#556}
+.mgp{display:inline-flex;align-items:center}.mgp .cd{margin-left:calc(var(--cs)*-.6);box-shadow:-2px 0 4px #000a}.mgp .cd:first-child{margin-left:0}
+.mgp b{margin-left:6px;font-family:var(--serif);color:var(--gold);font-size:calc(var(--bs)*.3 + 4px)}
+.rtab>div{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0;font-size:14px}.rtab b{width:100%;color:var(--gold);font-family:var(--serif);font-size:13px}
+.rtab i{font-style:normal;font-family:var(--serif);font-weight:800;color:var(--gold)}
+.hint2{font-size:11px;color:#99a}.rsk{margin-top:8px;padding:8px;border:1px solid #e8d9a055;border-radius:10px;background:#0006;font-size:13px}.rsk b{color:var(--gold)}
