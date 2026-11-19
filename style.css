@@ -107,7 +107,7 @@ input{font-size:17px;padding:10px 12px;border-radius:10px;border:1px solid #e8d9
  #app{padding:6px}
  .hero{padding:14px 0 6px}
  .game{display:flex;flex-direction:column;gap:8px}.gl,.gr{display:contents}
- .msg{order:1;top:0;margin:0}.order{order:2;margin:0}.others{order:3}.nx{order:4;margin:0}.bd.big{order:5}.sum{order:6;margin:0}.od small{font-size:9px;max-width:48px}
+ .nx{order:1;margin:0}.bd.big{order:2}.msg{order:3;top:0;margin:0}.order{order:4;margin:0}.others{order:5}.sum{order:6;margin:0}.od small{font-size:9px;max-width:48px}
  .msg .mt{font-size:22px}.msg .mx{font-size:14px}.msg button{font-size:14px;padding:8px 12px}
  .others{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
  .bd.sm{--bs:calc((100vw - 88px)/10);padding:6px}
@@ -154,3 +154,28 @@ select{font-size:14px;padding:6px;border-radius:8px;background:#070b26;color:#ff
 .rtab>div{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0;font-size:14px}.rtab b{width:100%;color:var(--gold);font-family:var(--serif);font-size:13px}
 .rtab i{font-style:normal;font-family:var(--serif);font-weight:800;color:var(--gold)}
 .hint2{font-size:11px;color:#99a}.rsk{margin-top:8px;padding:8px;border:1px solid #e8d9a055;border-radius:10px;background:#0006;font-size:13px}.rsk b{color:var(--gold)}
+
+/* バナー折り返し対策 */
+.banner{width:max-content;max-width:94vw}.banner .bl span,.banner .b2,.banner .t,.banner div{white-space:nowrap}
+@media(max-width:760px){.banner{padding:10px 16px;font-size:17px}.banner .t{font-size:22px}.banner .bl{gap:14px;font-size:16px}.banner .tot{font-size:24px}.banner .b2{font-size:13px}}
+/* 種族選択(キャラセレ風) */
+.seat.pf{border-color:var(--gold);box-shadow:0 0 12px #e8d9a066}.seat[onclick]{cursor:pointer}
+.rsel{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.rt3{position:relative;aspect-ratio:1;border-radius:12px;border:2px solid #e8d9a055;background:linear-gradient(160deg,#27327f,#0b1038);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:4px;transition:transform .12s}
+.rt3:hover{transform:scale(1.04)}.rt3 .ic{font-size:clamp(28px,8vw,44px);line-height:1.1}.rt3 b{font-family:var(--serif);font-size:15px}.rt3 small{font-size:11px;color:var(--gold)}
+.rt3.mine{border-color:#fff;box-shadow:0 0 20px #8aa0ffcc;background:linear-gradient(160deg,#4152c4,#141c66)}
+.rt3.taken{opacity:.35}
+.rt3 .tg{position:absolute;bottom:3px;left:3px;right:3px;font-size:10px;background:var(--gold);color:#000;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdesc{min-height:44px;font-size:13px;margin:6px 0;padding:8px;border:1px solid #e8d9a055;border-radius:10px;background:#0006;text-align:left}.rdesc b{color:var(--gold)}
+/* めくり演出 */
+.fx{position:fixed;inset:0;z-index:80;background:radial-gradient(#0b1033ea,#02040dfa);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;animation:fade .3s}
+.fxt{font-family:var(--serif);font-weight:800;font-size:clamp(24px,7vw,42px);color:var(--gold);animation:beat .6s ease-in-out infinite alternate}
+@keyframes beat{from{transform:scale(1);opacity:.7}to{transform:scale(1.12);opacity:1}}
+.fxs{font-family:var(--serif);font-size:clamp(16px,4.5vw,24px);color:#fff;letter-spacing:.2em}
+.fxr{display:flex;gap:16px}.fxc{perspective:700px}
+.fxi{position:relative;width:min(120px,26vw);aspect-ratio:1;transform-style:preserve-3d;animation:fxshake 1.5s linear,fxflip .7s ease calc(1.5s + var(--k)*.6s) forwards}
+.fxb,.fxf{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;border:3px solid #e8d9a0;box-shadow:0 0 24px #8aa0ff88}
+.fxb{background:radial-gradient(circle at 50% 40%,#3b4aa8,#10164a)}.fxb::after{content:'★';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--gold)}
+.fxf{transform:rotateY(180deg);background:var(--img) center/cover no-repeat,var(--c);display:flex;align-items:center;justify-content:center;font:800 34px var(--serif);color:#fff;text-shadow:0 0 5px #000}
+@keyframes fxshake{0%,100%{transform:translateX(0) rotate(0)}8%{transform:translateX(-7px) rotate(-3deg)}16%{transform:translateX(7px) rotate(3deg)}24%{transform:translateX(-9px) rotate(-4deg)}32%{transform:translateX(9px) rotate(4deg)}45%{transform:translateX(-11px) rotate(-5deg)}58%{transform:translateX(11px) rotate(5deg)}75%{transform:translateX(-13px) rotate(-6deg)}90%{transform:translateX(13px) rotate(6deg)}}
+@keyframes fxflip{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(90deg) scale(1.35)}100%{transform:rotateY(180deg) scale(1.1)}}

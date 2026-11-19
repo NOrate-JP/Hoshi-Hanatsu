@@ -3,10 +3,11 @@ const db=firebase.database();
 const COL={R:'#e53935',B:'#1e88e5',Y:'#f9a825',G:'#43a047',P:'#8e24aa'},JP={R:'赤',B:'青',Y:'黄',G:'緑',P:'紫'},K='RBYGP';
 const RACES={dwarf:['ドワーフ','選別','「ランダムに引く」で4枚引き、2枚を選んで配置(残りは捨て札)'],elf:['エルフ','誘引','「ランダムに引く」で3枚引き、3枚とも配置'],oni:['鬼人','技術','連続したスロットだけで流星魔法が揃うたび (枚数-2)点を即加点'],fairy:['妖精','除去','追加アクション「取り除く」で、自分の1枚に加えて他プレイヤー1人の最前1枚も取り除く'],mage:['魔法族','属性','自分のプレイヤーカラーと同じ色で発動すると、揃った枚数ぶん即加点'],goblin:['ゴブリン','運','各ターン1回目の魔法後、「1枚配置」で3枚引いて3枚配置'],human:['人族','基礎','基礎ポイントがすべて+1P'],beast:['獣人','連鎖','流星群ボーナスが2倍'],dragon:['竜人','節約','スロットが4列になり、基礎ポイントが2倍(開始時に4色を選ぶ)']};
 const RK=Object.keys(RACES);
+const RICON={dwarf:'⛏️',elf:'🍃',oni:'👹',fairy:'🧚',mage:'🔮',goblin:'🍀',human:'🛡️',beast:'🐺',dragon:'🐉'};
 const rc=()=>K[Math.random()*5|0],rp=()=>rc()+rc(),cp=o=>JSON.parse(JSON.stringify(o));
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
-let suSel=[],selSet=[],backLobby=false,lastSev=null,jT=null,resReady=true,hideRes=false,uid,code,room,g,prev=null,lastEv=null,sel=0,mode='',asg=[],ps=-1,cpuT=null;
+let pickFor=null,viewRace=null,lastFx=null,fxUntil=0,suSel=[],selSet=[],backLobby=false,lastSev=null,jT=null,resReady=true,hideRes=false,uid,code,room,g,prev=null,lastEv=null,sel=0,mode='',asg=[],ps=-1,cpuT=null;
 firebase.auth().signInAnonymously().then(r=>{uid=r.user.uid;render()}).catch(e=>{$('app').textContent='ログイン失敗: '+e.message});
 
 /* ---------- ロビー ---------- */
@@ -27,6 +28,12 @@ function toggleAdv(){db.ref('rooms/'+code+'/adv').set(room.adv?0:1)}
 function setGoal(v){db.ref('rooms/'+code+'/goal').set(Math.max(5,Math.min(99,+v||20)))}
 function setRmode(v){db.ref('rooms/'+code+'/rmode').set(v)}
 function toggleDup(){db.ref('rooms/'+code+'/dup').set(room.dup?0:1)}
+function toggleFx(){db.ref('rooms/'+code+'/fx').set(room.fx===0?1:0)}
+function setPF(id){pickFor=id;viewRace=null;render()}
+function pickRace(k){viewRace=k||null;if(!k){setRace(pickFor,'');return}
+ const tk=!room.dup&&Object.entries(room.players).some(([id,q])=>id!==pickFor&&q.race===k);
+ if(tk){render();return}
+ setRace(pickFor,(room.players[pickFor]||{}).race===k?'':k)}
 function setRace(id,v){db.ref('rooms/'+code+'/players/'+id+'/race').set(v)}
 function start(){backLobby=false;hideRes=false;prev=null;lastEv=null;lastSev=null;suSel=[];selSet=[];
  const adv=!!room.adv,goal=Math.max(5,Math.min(99,+room.goal||20));
@@ -37,7 +44,7 @@ function start(){backLobby=false;hideRes=false;prev=null;lastEv=null;lastSev=nul
  for(let i=ps.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[ps[i],ps[j]]=[ps[j],ps[i]]}
  const b=ps.map(p=>p.race==='dragon'?(p.cpu?[...K].sort(()=>Math.random()-.5).slice(0,4):['','','','']):[...K]);
  const rd=ps.map(p=>p.race==='dragon'&&!p.cpu?0:1);
- db.ref('rooms/'+code+'/g').set({v:1,gid:Math.random(),bp:0,sb:0,ib:0,adv:adv?1:0,goal,pl:ps,b,rd,s:ps.map(()=>0),
+ db.ref('rooms/'+code+'/g').set({v:1,gid:Math.random(),bp:0,sb:0,ib:0,adv:adv?1:0,fx:room.fx===0?0:1,goal,pl:ps,b,rd,s:ps.map(()=>0),
   pc:[...K].sort(()=>Math.random()-.5).slice(0,ps.length).join(''),nx:[rp(),rp()],t:0,ph:rd.every(x=>x)?'pick':'setup',hand:'',bc:'',combo:0,push:'',log:'ゲーム開始！',win:-1})}
 function suToggle(c){const k=suSel.indexOf(c);if(k>=0)suSel.splice(k,1);else if(suSel.length<4)suSel.push(c);render()}
 function suOk(){if(suSel.length!==4)return;const me=g.pl.findIndex(p=>p.id===uid),cs=suSel.slice();suSel=[];
@@ -65,23 +72,25 @@ function judge(n){const b=n.b[n.t],cnt={};
  idx.forEach(i=>{b[i]=b[i].slice(0,-1)});
  n.ev={id:Math.random(),p:n.t,c:col,m,b:bp,x:sb,r:im};
  n.log=n.pl[n.t].name+'：流星魔法！'+JP[col]+'×'+m;
- n.ph='bonus';n.bc=''}
+ n.ph='bonus';n.bc='';n.fxid=0}
 function endTurn(n){
  if(n.bp>0){const tot=n.bp+n.sb;n.s[n.t]+=tot;n.sev={id:Math.random(),p:n.t,bp:n.bp,sb:n.sb,tot,ib:n.ib||0};n.log=n.pl[n.t].name+'：合計 '+tot+'P 獲得！'}
- n.bp=0;n.sb=0;n.ib=0;n.fin=0;n.combo=0;n.push='';n.hand='';n.bc='';n.q=[];n.mg=[];
+ n.bp=0;n.sb=0;n.ib=0;n.fin=0;n.combo=0;n.push='';n.hand='';n.bc='';n.q=[];n.mg=[];n.fxid=0;
  if(n.t===n.pl.length-1&&n.s.some(x=>x>=n.goal)){n.ph='over';n.win=n.s.indexOf(Math.max(...n.s));return}
  n.t=(n.t+1)%n.pl.length;n.ph='pick'}
 function aPick(n,i){let p='';const r=rcOf(n);
  if(i<0){const k=r==='dwarf'?4:r==='elf'?3:2;for(let j=0;j<k;j++)p+=rc()}else{p=n.nx[i];n.nx[i]=rp()}
  n.hand=p;if(i<0&&r==='dwarf'){n.ph='sel';n.log=n.pl[n.t].name+'：4枚から2枚を選ぶ'}else{n.ph='place';n.log=n.pl[n.t].name+'：カードを置く'}}
 function aKeep(n,ix){n.hand=ix.slice().sort().map(k=>n.hand[k]).join('');n.ph='place';n.log=n.pl[n.t].name+'：カードを置く'}
-function aFlip(n){n.bc=(rcOf(n)==='goblin'&&n.combo===1)?rc()+rc()+rc():rc();n.log=n.pl[n.t].name+'：山札をめくった！'}
+function chance(n){const b=n.b[n.t],c={};b.forEach(x=>{if(x){const k=x[x.length-1];c[k]=(c[k]||0)+1}});
+ return [...K].some(x=>{const k=c[x]||0;return k>=3||(k===2&&b.some(y=>!y||y[y.length-1]!==x))})}
+function aFlip(n){n.bc=(rcOf(n)==='goblin'&&n.combo===1)?rc()+rc()+rc():rc();n.log=n.pl[n.t].name+'：山札をめくった！';if(n.fx&&n.combo>=3&&chance(n)){n.fxid=Math.random();n.fxc=n.bc}}
 function aPlace(n,hi,col){if(hi<0||hi>=n.hand.length)return 0;
  const c=n.hand[hi];n.hand=n.hand.slice(0,hi)+n.hand.slice(hi+1);n.b[n.t][col]+=c;
  if(!n.hand)after(n);return 1}
 function aBonusRemove(n,col){const b=n.b[n.t];if(!b[col])return 0;b[col]=b[col].slice(0,-1);if(rcOf(n)==='fairy'&&n.b.some((x,i)=>i!==n.t&&x.some(c=>c))){n.ph='fairy';n.log=n.pl[n.t].name+'：妖精の除去！ 他の人から1枚'}else after(n);return 1}
 function aRemoveOther(n,pi,col){const b=n.b[pi];if(pi===n.t||!b[col])return 0;b[col]=b[col].slice(0,-1);after(n);return 1}
-function aBonusPlace(n,col,k){k=k||0;const c=n.bc[k];n.bc=n.bc.slice(0,k)+n.bc.slice(k+1);n.b[n.t][col]+=c;if(!n.bc)after(n);return 1}
+function aBonusPlace(n,col,k){k=k||0;const c=n.bc[k];n.bc=n.bc.slice(0,k)+n.bc.slice(k+1);n.b[n.t][col]+=c;if(!n.bc){n.fxid=0;after(n)}return 1}
 function aPush(n,a){n.q=a.map(x=>x.to+x.c);n.push='';n.ph='recv';
  n.log=n.pl[n.t].name+'が押し付け！ '+n.pl[+n.q[0][0]].name+'：'+JP[n.q[0][1]]+'を置く'}
 function aRecv(n,col){const it=n.q[0],to=+it[0];n.b[to][col]+=it[1];n.q=n.q.slice(1);
@@ -94,7 +103,7 @@ function best(b,card){let bs=-1,cs=[];b.forEach((c,i)=>{const t=b.slice();t[i]=c
  if(m>bs){bs=m;cs=[i]}else if(m===bs)cs.push(i)});return cs[Math.random()*cs.length|0]}
 function cpuCheck(){clearTimeout(cpuT);if(!g||g.ph==='over'||g.ph==='judge'||g.ph==='setup'||room.host!==uid)return;
  const n=gc();if(!n.pl[actor(n)].cpu)return;
- const v=g.v;cpuT=setTimeout(()=>{if(g&&g.v===v)cpuAct()},1200)}
+ const v=g.v;const w=Math.max(1200,fxUntil-Date.now()+600);cpuT=setTimeout(()=>{if(g&&g.v===v)cpuAct()},w)}
 function cpuAct(){const n=gc(),b=n.b[n.t];
  if(n.ph==='pick'){const sc=n.nx.map(p=>{const t=b.slice();for(const ch of p){const i=best(t,ch);t[i]+=ch}return maxSame(t)});
   aPick(n,sc[0]>=sc[1]?0:1)}
@@ -136,8 +145,7 @@ function stockH(i,small){const n=gc(),o=[];let qi=0;const st='data-st="1"';
  if(g.ph==='setup'){if(!small&&g.pl[i].race==='dragon'&&!g.rd[i])[...K].forEach(c=>{const k=suSel.indexOf(c);o.push([c,k>=0?'sel':'',`onclick="suToggle('${c}')"`,k>=0?k+1:''])})}
  else if(g.ph==='sel'&&i===g.t)[...g.hand].forEach((x,k)=>o.push([x,!small&&selSet.includes(k)?'sel':'',!small?`onclick="toggleSel(${k})"`:'','']));
  else if(g.ph==='place'&&i===g.t)[...g.hand].forEach((x,k)=>o.push([x,!small&&sel===k?'sel':'',!small?`onclick="setSel(${k})"`:'','']));
- else if(g.ph==='bonus'&&i===g.t){[...(g.bc||'')].forEach((x,k)=>o.push([x,(!small&&sel===k?'sel ':'')+'cur',!small?`onclick="setSel(${k})"`:'','']));[...(g.push||'')].forEach(x=>o.push([x,'',st,'']))}
- else if(g.ph==='judge'&&i===g.t)[...(g.push||'')].forEach(x=>o.push([x,'',st,'']));
+ else if(g.ph==='bonus'&&i===g.t){[...(g.bc||'')].forEach((x,k)=>o.push([x,(!small&&sel===k?'sel ':'')+'cur',!small?`onclick="setSel(${k})"`:'','']))}
  else if(g.ph==='push'&&i===g.t)[...g.push].forEach((x,k)=>{const d=asg.findIndex(a=>a.i===k);o.push([x,(ps===k?'sel ':'')+(d>=0?'dim':''),st+(!small?` onclick="selPush(${k})"`:''),d>=0?d+1:''])});
  else if(g.ph==='recv')n.q.forEach((it,k)=>{if(+it[0]===i){qi++;o.push([it[1],k===0?'cur':'','',qi])}});
  return `<div class="stock">`+o.map(([x,c,e,bd])=>`<span class="sk">${cardH(x,c,e,small)}${bd?`<em>${bd}</em>`:''}</span>`).join('')+`</div>`}
@@ -162,6 +170,10 @@ function banner(ev){const d=document.createElement('div');d.className='banner';d
 function tallyBanner(e){const d=document.createElement('div');d.className='banner long';d.style.borderColor='#e8d9a0';
  d.innerHTML=`<div class="t">${esc(g.pl[e.p].name)} の獲得</div><div class="bl"><span>基礎ポイント</span><b>${e.bp}P</b></div><div class="bl"><span>流星群ボーナス</span><b>${e.sb}P</b></div><div class="bl tot"><span>合計</span><b>${e.tot}P</b></div>${e.ib?`<div class="b2">＋種族技能 ${e.ib}P(加点済)</div>`:''}`;
  document.body.appendChild(d);setTimeout(()=>d.remove(),2750);burst('#e8d9a0',26)}
+function flipFx(cs){cs=[...cs];const d=document.createElement('div');d.className='fx';
+ d.innerHTML=`<div class="fxt">山札をめくる…！</div><div class="fxr">`+cs.map((x,k)=>`<div class="fxc" style="--k:${k}"><div class="fxi"><div class="fxb"></div><div class="fxf" style="--img:url('${CARD_IMG[x]}');--c:${COL[x]}">${CARD_LABEL?JP[x]:''}</div></div></div>`).join('')+`</div><div class="fxs">コンボのチャンス！</div>`;
+ document.body.appendChild(d);const dur=1500+700+(cs.length-1)*600+1000;fxUntil=Date.now()+dur;setTimeout(()=>d.remove(),dur);
+ cs.forEach((x,k)=>setTimeout(()=>burst(COL[x],10),1500+k*600+400))}
 function animate(old){
  if(prev&&prev.v!==g.v&&prev.pl.length===g.pl.length)g.s.forEach((v,i)=>{if(prev.s[i]!==v){const e=document.querySelector('[data-sc="'+i+'"]');e&&e.classList.add('pop')}});
  if(prev&&prev.v!==g.v&&prev.pl.length===g.pl.length)
@@ -169,9 +181,10 @@ function animate(old){
    if(s.length>o.length&&s.startsWith(o)){for(let k=o.length;k<s.length;k++){const e=document.querySelector(`[data-k="${p}-${c}-${k}"]`);e&&e.classList.add('new')}}
    else if(o.length>s.length&&o.startsWith(s)){for(let k=s.length;k<o.length;k++){const d=old[p+'-'+c+'-'+k];d&&ghost(d)}}}));
  if(prev&&prev.v!==g.v&&(g.push||'').length>(prev.push||'').length){const e=[...document.querySelectorAll('[data-st]')].pop();e&&e.classList.add('new')}
- if(!prev){lastEv=g.ev&&g.ev.id;lastSev=g.sev&&g.sev.id}
+ if(!prev){lastEv=g.ev&&g.ev.id;lastSev=g.sev&&g.sev.id;lastFx=g.fxid||null}
  else{if(g.ev&&g.ev.id!==lastEv){lastEv=g.ev.id;banner(g.ev)}
-  if(g.sev&&g.sev.id!==lastSev){lastSev=g.sev.id;tallyBanner(g.sev)}}}
+  if(g.sev&&g.sev.id!==lastSev){lastSev=g.sev.id;tallyBanner(g.sev)}
+  if(g.fxid&&g.fxid!==lastFx){lastFx=g.fxid;flipFx(g.fxc)}}}
 function resultH(){const r=g.pl.map((p,i)=>({i,s:g.s[i]})).sort((x,y)=>y.s-x.s||x.i-y.i),N=r.length;
  return `<div class="result"><div class="rbox"><div class="rt">— RESULT —</div><div class="rh">${esc(g.pl[r[0].i].name)} の勝利！</div>`+
  r.map((o,k)=>`<div class="rr${k?'':' top'}" style="--pc:${COL[(g.pc||K)[o.i]]};--d:${N-1-k}"><span class="rk">${k+1}<small>位</small></span><span class="gem"></span><span class="rn">${esc(g.pl[o.i].name)}${g.pl[o.i].cpu?' (CPU)':''}</span><span class="rs">${o.s}<small>点</small></span></div>`).join('')+
@@ -186,18 +199,19 @@ function render(){const A=$('app');
  if(!code){A.innerHTML=titleH(0)+`<div class="panel entry"><label>なまえ</label><input id="nm" value="${esc(localStorage.hn||'')}" maxlength="10"><br><button class="pri" onclick="mk()">部屋をつくる</button><div class="or">─ または ─</div><label>部屋コード</label><input id="cd" size="6" inputmode="numeric"><br><button onclick="jn()">参加する</button></div>`;return}
  if(!room){A.textContent='読み込み中…';return}
  if(backLobby&&g&&g.ph!=='over')backLobby=false;
- if(!g||backLobby){prev=null;const ps=Object.entries(room.players||{}).sort((a,b)=>a[1].t-b[1].t),host=room.host===uid,adv=!!room.adv,goal=room.goal||20;
-  const rm=room.rmode==='random'?'random':'free',dup=!!room.dup;
-  const opt=(cur,id)=>{const tk=dup?[]:ps.filter(([k,q])=>k!==id&&q.race).map(([,q])=>q.race);return `<option value="">ランダム</option>`+RK.map(k=>`<option value="${k}" ${cur===k?'selected':''} ${tk.includes(k)?'disabled':''}>${RACES[k][0]}【${RACES[k][1]}】</option>`).join('')};
+ if(!g||backLobby){prev=null;const ps=Object.entries(room.players||{}).sort((a,b)=>a[1].t-b[1].t),host=room.host===uid,adv=!!room.adv,goal=room.goal||20,rm=room.rmode==='random'?'random':'free',dup=!!room.dup,fx=room.fx!==0;
+  const ce=ps.find(([k])=>k===pickFor);if(!ce||!(pickFor===uid||(ce[1].c&&host)))pickFor=uid;
+  const pf=(room.players||{})[pickFor]||{},mine=pf.race||'',vk=viewRace||mine,fr=adv&&rm==='free';
   const seats=[0,1,2,3,4].map(i=>{const e=ps[i];if(!e)return `<div class="seat"><span class="gem off"></span>空席</div>`;const [id,p]=e,can=id===uid||(p.c&&host);
-   const rs=adv?(rm==='random'?'<small>開始時に決定</small>':can?`<select onchange="setRace('${id}',this.value)">${opt(p.race||'',id)}</select>`:`<small>${p.race?RACES[p.race][0]+'【'+RACES[p.race][1]+'】':'ランダム'}</small>`):'';
-   return `<div class="seat on"><span class="gem" style="--pc:#e8d9a0"></span><span class="sn2">${esc(p.n)}${p.c?' <small>CPU</small>':''}</span>${rs}</div>`}).join('');
+   return `<div class="seat on ${fr&&id===pickFor?'pf':''}" ${fr&&can?`onclick="setPF('${id}')"`:''}><span class="gem" style="--pc:#e8d9a0"></span><span class="sn2">${esc(p.n)}${p.c?' <small>CPU</small>':''}</span>${adv?(rm==='random'?'<small>開始時に決定</small>':`<small>${p.race?RACES[p.race][0]+'【'+RACES[p.race][1]+'】':'ランダム'}</small>`):''}</div>`}).join('');
+  const tiles=fr?`<div class="ttl">◆ 種族選択 <small>${esc(pf.n||'')} の種族${pickFor!==uid?'(CPU)':''}</small></div><div class="rsel">`+RK.map(k=>{const hs=ps.filter(([,q])=>q.race===k).map(([,q])=>esc(q.n)),tk=!dup&&ps.some(([id,q])=>id!==pickFor&&q.race===k);
+   return `<div class="rt3 ${mine===k?'mine':''} ${tk?'taken':''}" onclick="pickRace('${k}')"><div class="ic">${RICON[k]}</div><b>${RACES[k][0]}</b><small>${RACES[k][1]}</small>${hs.length?`<span class="tg">${hs.join(',')}</span>`:''}</div>`}).join('')+`</div><div class="rdesc">${vk?`<b>${RACES[vk][0]}【${RACES[vk][1]}】</b> ${RACES[vk][2]}`:'ランダム：開始時に決まります'}</div><button class="g" onclick="pickRace('')">ランダムにする</button>`:(adv?'<div class="hint">種族は開始時にランダムで決まります</div>':'');
   A.innerHTML=titleH(0)+`<div class="panel lobby"><div class="ttl">◆ 部屋コード ◆</div><div class="code">${code}</div><div class="hint">このコードを仲間に伝えよう</div>`+
-  `<div class="opts"><div>アドバンスルール <button class="${adv?'pri':'g'}" ${host?'':'disabled'} onclick="toggleAdv()">${adv?'ON':'OFF'}</button></div><div>終了点数 <input type="number" min="5" max="99" value="${goal}" ${host?'':'disabled'} onchange="setGoal(this.value)"> 点</div></div>`+
-  (adv?`<div class="opts"><div>種族 <button class="${rm==='free'?'pri':'g'}" ${host?'':'disabled'} onclick="setRmode('free')">自由に選択</button><button class="${rm==='random'?'pri':'g'}" ${host?'':'disabled'} onclick="setRmode('random')">全員ランダム</button></div><div>重複 <button class="${dup?'pri':'g'}" ${host?'':'disabled'} onclick="toggleDup()">${dup?'あり':'なし'}</button></div></div>`:'')+(adv?`<div class="races">${RK.map(k=>`<div><b>${RACES[k][0]}【${RACES[k][1]}】</b> ${RACES[k][2]}</div>`).join('')}</div>`:'')+
-  `<div class="seats">${seats}</div>`+
+  `<div class="opts"><div>アドバンスルール <button class="${adv?'pri':'g'}" ${host?'':'disabled'} onclick="toggleAdv()">${adv?'ON':'OFF'}</button></div><div>めくり演出 <button class="${fx?'pri':'g'}" ${host?'':'disabled'} onclick="toggleFx()">${fx?'ON':'OFF'}</button></div><div>終了点数 <input type="number" min="5" max="99" value="${goal}" ${host?'':'disabled'} onchange="setGoal(this.value)"> 点</div></div>`+
+  (adv?`<div class="opts"><div>種族 <button class="${rm==='free'?'pri':'g'}" ${host?'':'disabled'} onclick="setRmode('free')">自由に選択</button><button class="${rm==='random'?'pri':'g'}" ${host?'':'disabled'} onclick="setRmode('random')">全員ランダム</button></div><div>重複 <button class="${dup?'pri':'g'}" ${host?'':'disabled'} onclick="toggleDup()">${dup?'あり':'なし'}</button></div></div>`:'')+
+  `<div class="seats">${seats}</div>${tiles}<div style="margin-top:10px"></div>`+
   (host?`<button class="g" onclick="addCpu()">CPUを追加</button><button class="pri" onclick="start()" ${ps.length<2?'disabled':''}>ゲーム開始</button>`:'<div class="hint">ホストの開始を待っています…</div>')+`<br><button class="g" onclick="toTitle()">タイトルに戻る</button></div>`;return}
- if(prev&&prev.gid!==g.gid){prev=null;lastEv=null;lastSev=null;hideRes=false;resReady=true}
+ if(prev&&prev.gid!==g.gid){prev=null;lastEv=null;lastSev=null;lastFx=null;hideRes=false;resReady=true}
  if(prev&&prev.ph!=='over'&&g.ph==='over'&&prev.v!==g.v){resReady=false;setTimeout(()=>{resReady=true;render()},2900)}
  const me=g.pl.findIndex(p=>p.id===uid),mt=myTurn(),n=gc(),a=actor(n),an=esc(g.pl[a].name);
  let tt,mx='',mb='';
