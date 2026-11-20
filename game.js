@@ -104,18 +104,7 @@ function best(b,card){let bs=-1,cs=[];b.forEach((c,i)=>{const t=b.slice();t[i]=c
 function cpuCheck(){clearTimeout(cpuT);if(!g||g.ph==='over'||g.ph==='judge'||g.ph==='setup'||room.host!==uid)return;
  const n=gc();if(!n.pl[actor(n)].cpu)return;
  const v=g.v;const w=Math.max(1200,fxUntil-Date.now()+600);cpuT=setTimeout(()=>{if(g&&g.v===v)cpuAct()},w)}
-function cpuAct(){const n=gc(),b=n.b[n.t];
- if(n.ph==='pick'){const sc=n.nx.map(p=>{const t=b.slice();for(const ch of p){const i=best(t,ch);t[i]+=ch}return maxSame(t)});
-  aPick(n,sc[0]>=sc[1]?0:1)}
- else if(n.ph==='place')aPlace(n,0,best(b,n.hand[0]));
- else if(n.ph==='fairy'){const c=n.pl.map((_,i)=>i).filter(i=>i!==n.t&&n.b[i].some(x=>x)).sort((a,b)=>n.s[b]-n.s[a])[0];aRemoveOther(n,c,n.b[c].findIndex(x=>x))}
- else if(n.ph==='sel'){let bs=-1,bi=[0,1];for(let x=0;x<4;x++)for(let y=x+1;y<4;y++){const t=b.slice();for(const k of[x,y]){const ch=n.hand[k];t[best(t,ch)]+=ch}const m=maxSame(t);if(m>bs){bs=m;bi=[x,y]}}aKeep(n,bi)}
- else if(n.ph==='bonus'){if(!n.bc)aFlip(n);else aBonusPlace(n,best(b,n.bc[0]),0)}
- else if(n.ph==='push'){const o=n.pl.map((_,i)=>i).filter(i=>i!==n.t).sort((a,c)=>n.s[c]-n.s[a]);
-  aPush(n,[...n.push].map(c=>({c,to:o[0]})))}
- else if(n.ph==='recv'){const i=+n.q[0][0];aRecv(n,best(n.b[i],n.q[0][1]))}
- commit(n)}
-
+function cpuAct(){const n=gc();AI.act(n);commit(n)}
 function judgeCheck(){clearTimeout(jT);if(!g||g.ph!=='judge')return;
  const t=g.pl[g.t],run=t.cpu?room.host===uid:t.id===uid;if(!run)return;
  const v=g.v;jT=setTimeout(()=>{if(!g||g.v!==v||g.ph!=='judge')return;const n=gc();if(n.fin)endTurn(n);else judge(n);commit(n)},1000)}
@@ -172,8 +161,8 @@ function tallyBanner(e){const d=document.createElement('div');d.className='banne
  document.body.appendChild(d);setTimeout(()=>d.remove(),2750);burst('#e8d9a0',26)}
 function flipFx(cs){cs=[...cs];const d=document.createElement('div');d.className='fx';
  d.innerHTML=`<div class="fxt">山札をめくる…！</div><div class="fxr">`+cs.map((x,k)=>`<div class="fxc" style="--k:${k}"><div class="fxi"><div class="fxb"></div><div class="fxf" style="--img:url('${CARD_IMG[x]}');--c:${COL[x]}">${CARD_LABEL?JP[x]:''}</div></div></div>`).join('')+`</div><div class="fxs">コンボのチャンス！</div>`;
- document.body.appendChild(d);const dur=1500+700+(cs.length-1)*600+1000;fxUntil=Date.now()+dur;setTimeout(()=>d.remove(),dur);
- cs.forEach((x,k)=>setTimeout(()=>burst(COL[x],10),1500+k*600+400))}
+ document.body.appendChild(d);const dur=600+(cs.length-1)*900+600+1000;fxUntil=Date.now()+dur;setTimeout(()=>d.remove(),dur);
+ cs.forEach((x,k)=>setTimeout(()=>burst(COL[x],10),600+k*900+500))}
 function animate(old){
  if(prev&&prev.v!==g.v&&prev.pl.length===g.pl.length)g.s.forEach((v,i)=>{if(prev.s[i]!==v){const e=document.querySelector('[data-sc="'+i+'"]');e&&e.classList.add('pop')}});
  if(prev&&prev.v!==g.v&&prev.pl.length===g.pl.length)
@@ -214,7 +203,7 @@ function render(){const A=$('app');
  if(prev&&prev.gid!==g.gid){prev=null;lastEv=null;lastSev=null;lastFx=null;hideRes=false;resReady=true}
  if(prev&&prev.ph!=='over'&&g.ph==='over'&&prev.v!==g.v){resReady=false;setTimeout(()=>{resReady=true;render()},2900)}
  const me=g.pl.findIndex(p=>p.id===uid),mt=myTurn(),n=gc(),a=actor(n),an=esc(g.pl[a].name);
- let tt,mx='',mb='';
+ let tt,mx='',mb='';const rr=g.adv?(g.pl[g.t].race||''):'';
  if(g.ph==='over'){tt='ゲーム終了';mx='全員の手番が終わりました';mb=`<button class="pri" onclick="hideRes=false;render()">結果を見る</button><button onclick="toLobby()">ロビーに戻る</button><button class="g" onclick="toTitle()">タイトルに戻る</button>`}
  else if(g.ph==='setup'){tt='準備中';const sd=me>=0&&g.pl[me].race==='dragon'&&!g.rd[me];mx=sd?'竜人：置く4色を左の列から順にタップして選んでください':'竜人が色を選んでいます…';if(sd)mb=`<button class="pri" ${suSel.length===4?'':'disabled'} onclick="suOk()">この4色で開始</button>`}
  else{tt=mt?'あなたの番':an+' の番';
@@ -224,7 +213,7 @@ function render(){const A=$('app');
   else if(g.ph==='place')mx=mt?'ストックの星を選んで、置く列をタップしてください':'星を置いています…';
   else if(g.ph==='judge')mx=n.fin?'得点を集計しています…':'流星魔法の判定中…';
   else if(g.ph==='bonus'){mx=mt?(g.bc?'めくれた星を置く列をタップしてください':'魔法ボーナス！ 山札をめくるか、一番下を除外'):'魔法ボーナスを選んでいます…';
-   if(mt&&!g.bc)mb=`<button class="${mode==='x'?'':'g'}" onclick="setMode('x')">${rcOf(n)==='fairy'?'一番下を除外(自分1枚+他の人1枚)':'一番下を除外(列をタップ)'}</button><button onclick="flip()">山札から${rcOf(n)==='goblin'&&n.combo===1?3:1}枚めくる</button>`}
+   if(mt&&!g.bc)mb=`<button class="${mode==='x'?'':'g'} ${rr==='fairy'?'skl':''}" onclick="setMode('x')">${rcOf(n)==='fairy'?'一番下を除外(自分1枚+他の人1枚)':'一番下を除外(列をタップ)'}</button><button class="${rr==='goblin'&&n.combo===1?'skl':''}" onclick="flip()">山札から${rcOf(n)==='goblin'&&n.combo===1?3:1}枚めくる</button>`}
   else if(g.ph==='push'){mx=mt?'ストックの星を、渡す順にタップ'+(g.pl.length>2?' → 相手を選ぶ':''):'星を押し付けています…';
    if(mt)mb=(g.pl.length>2?g.pl.map((p,i)=>i===g.t?'':`<button onclick="giveTo(${i})">${esc(p.name)}</button>`).join(''):'')+`<button class="g" onclick="resetAsg()">やり直し</button>`}
   else if(g.ph==='recv')mx=mt?'押し付けられた星を置く列をタップしてください':'押し付けられた星を置いています…'}
@@ -232,7 +221,7 @@ function render(){const A=$('app');
  const others=g.pl.map((_,i)=>i===me?'':boardH(i,1)).join('');
  const can=mt&&g.ph==='pick',dis=can?'':'disabled';
  const old=snap();
- A.innerHTML=titleH(1,code)+`<div class="game"><div class="gl"><div class="panel nx"><div class="ttl">◆ ネクストスロット</div>${g.nx.map((p,i)=>`<span class="pair">${[...p].map(x=>cardH(x)).join('')}<button ${dis} onclick="pk(${i})">選ぶ</button></span>`).join('')}<button class="g" ${dis} onclick="pk(-1)">ランダムで引く</button></div>${me>=0?boardH(me,0):''}${sumH()}</div>`+
+ A.innerHTML=titleH(1,code)+`<div class="game"><div class="gl"><div class="panel nx"><div class="ttl">◆ ネクストスロット</div>${g.nx.map((p,i)=>`<span class="pair">${[...p].map(x=>cardH(x)).join('')}<button ${dis} onclick="pk(${i})">選ぶ</button></span>`).join('')}<button class="g ${can&&(rr==='dwarf'||rr==='elf')?'skl':''}" ${dis} onclick="pk(-1)">ランダムで引く</button></div>${me>=0?boardH(me,0):''}${sumH()}</div>`+
  `<div class="gr"><div class="panel msg ${mt?'mine':''}"><div class="mt">${tt}</div><div class="mx">${mx}</div><div class="mb">${mb}</div>${tl}<div class="lg">${esc(g.log)}</div></div>${orderH(a)}<div class="others n${g.pl.length-1}">${others}</div></div></div>`+
  (g.ph==='over'&&!hideRes&&resReady?resultH():'');
  animate(old);prev=g}
